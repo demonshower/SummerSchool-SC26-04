@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}历史行程{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">
+    <i class="bi bi-clock-history text-primary me-2"></i>历史行程
+</h2>
+
+{% set trips = [
+    {'id': 1, 'origin': '上海', 'destination': '杭州', 'start': '2026-08-10', 'end': '2026-08-12', 'meetings': 1, 'cost': 1280, 'budget': 2000, 'status': 'within_budget'},
+    {'id': 2, 'origin': '北京', 'destination': '南京', 'start': '2026-07-20', 'end': '2026-07-22', 'meetings': 2, 'cost': 3200, 'budget': 3000, 'status': 'slightly_over'},
+    {'id': 3, 'origin': '苏州', 'destination': '上海', 'start': '2026-06-15', 'end': '2026-06-16', 'meetings': 1, 'cost': 850, 'budget': 1500, 'status': 'within_budget'}
+] %}
+
+{% if trips %}
+<div class="row g-3">
+    {% for t in trips %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h5 class="card-title mb-0">
+                        <span class="badge bg-primary me-1">{{ t.origin }}</span>
+                        <i class="bi bi-arrow-right"></i>
+                        <span class="badge bg-primary ms-1">{{ t.destination }}</span>
+                    </h5>
+                    <span class="badge
+                        {% if t.status == 'within_budget' %}bg-success
+                        {% elif t.status == 'slightly_over' %}bg-warning text-dark
+                        {% else %}bg-danger{% endif %}">
+                        {% if t.status == 'within_budget' %}预算内
+                        {% elif t.status == 'slightly_over' %}略超预算
+                        {% else %}超预算{% endif %}
+                    </span>
+                </div>
+                <p class="card-text text-muted small mb-2">
+                    <i class="bi bi-calendar3 me-1"></i>{{ t.start }} ~ {{ t.end }}
+                    <br>
+                    <i class="bi bi-people me-1"></i>{{ t.meetings }} 场会议
+                </p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted">预计费用</small>
+                        <strong>¥{{ t.cost }}</strong>
+                        <small class="text-muted"> / ¥{{ t.budget }}</small>
+                    </div>
+                    <a href="{{ url_for('trips.detail', trip_id=t.id) }}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-eye me-1"></i>查看
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5">
+    <div class="display-1 text-muted mb-3">
+        <i class="bi bi-inbox"></i>
+    </div>
+    <h5 class="text-muted">暂无历史行程</h5>
+    <p class="text-muted mb-4">开始你的第一次出差规划吧！</p>
+    <a href="{{ url_for('trips.new') }}" class="btn btn-primary btn-lg">
+        <i class="bi bi-plus-circle me-2"></i>开始规划
+    </a>
+</div>
+{% endif %}
+{% endblock %}

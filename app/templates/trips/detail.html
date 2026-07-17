@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+{% block title %}行程详情{% endblock %}
+
+{% block content %}
+{% set trip = {
+    'id': 1,
+    'origin_city': '上海',
+    'destination_city': '杭州',
+    'earliest_departure': '2026-08-10 13:00',
+    'latest_return': '2026-08-12 21:00',
+    'budget': 2000,
+    'transport_preference': '高铁',
+    'hotel_max_price': 400,
+    'wants_sightseeing': True,
+    'attraction_preference': '自然',
+    'pace': '轻松'
+} %}
+
+{% set transport_go = {
+    'type': '高铁',
+    'name': 'G7311',
+    'departure': '2026-08-10 14:30',
+    'arrival': '2026-08-10 16:15',
+    'duration': '1h45min',
+    'price': 120,
+    'from': '上海虹桥',
+    'to': '杭州东'
+} %}
+
+{% set transport_back = {
+    'type': '高铁',
+    'name': 'G7318',
+    'departure': '2026-08-12 14:00',
+    'arrival': '2026-08-12 15:45',
+    'duration': '1h45min',
+    'price': 120,
+    'from': '杭州东',
+    'to': '上海虹桥'
+} %}
+
+{% set hotel = {
+    'name': '杭州西湖美居酒店',
+    'area': '西湖区',
+    'nightly_price': 350,
+    'rating': 4.5,
+    'distance_to_city_center_km': 2.5,
+    'description': '位于西湖区核心地段，距离西湖景区步行10分钟，周边餐饮购物便利。'
+} %}
+
+{% set day_types = {
+    '2026-08-10': '出发日',
+    '2026-08-11': '会议加游玩',
+    '2026-08-12': '返程日'
+} %}
+
+{% set daily_schedule = {
+    '2026-08-10': [
+        {'time': '14:30-16:15', 'icon': 'bi-train-front', 'title': '上海虹桥 → 杭州东', 'subtitle': 'G7311', 'location': '上海虹桥站→杭州东站', 'cost': 120, 'type': 'transport', 'fixed': True, 'note': '去程交通'},
+        {'time': '16:15-17:15', 'icon': 'bi-bus-front', 'title': '前往酒店', 'subtitle': '市内交通', 'location': '杭州东站→西湖区', 'cost': 20, 'type': 'commute', 'fixed': False, 'note': ''},
+        {'time': '17:15-', 'icon': 'bi-building', 'title': '入住杭州西湖美居酒店', 'subtitle': '住宿', 'location': '西湖区', 'cost': 350, 'type': 'hotel', 'fixed': True, 'note': '当晚入住'},
+        {'time': '17:30-18:30', 'icon': 'bi-cup-hot', 'title': '晚餐', 'subtitle': '餐饮', 'location': '酒店附近', 'cost': 60, 'type': 'meal', 'fixed': False, 'note': ''}
+    ],
+    '2026-08-11': [
+        {'time': '08:00-08:30', 'icon': 'bi-cup-straw', 'title': '早餐', 'subtitle': '餐饮', 'location': '酒店餐厅', 'cost': 20, 'type': 'meal', 'fixed': False, 'note': ''},
+        {'time': '08:30-09:00', 'icon': 'bi-bus-front', 'title': '前往会议地点', 'subtitle': '市内交通', 'location': '酒店→西湖区会议中心', 'cost': 20, 'type': 'commute', 'fixed': False, 'note': '预留30分钟通勤'},
+        {'time': '09:00-12:00', 'icon': 'bi-people', 'title': '项目研讨会', 'subtitle': '会议（固定）', 'location': '杭州市西湖区', 'cost': 0, 'type': 'meeting', 'fixed': True, 'note': '不可修改'},
+        {'time': '12:00-12:30', 'icon': 'bi-bus-front', 'title': '返回市区', 'subtitle': '市内交通', 'location': '会议中心→西湖景区', 'cost': 20, 'type': 'commute', 'fixed': False, 'note': ''},
+        {'time': '12:30-13:30', 'icon': 'bi-cup-hot', 'title': '午餐', 'subtitle': '餐饮', 'location': '西湖区餐厅', 'cost': 40, 'type': 'meal', 'fixed': False, 'note': ''},
+        {'time': '14:00-17:00', 'icon': 'bi-tree', 'title': '西湖风景区', 'subtitle': '自然风光', 'location': '西湖区', 'cost': 0, 'type': 'attraction', 'fixed': False, 'note': '推荐游览3小时'},
+        {'time': '17:30-18:30', 'icon': 'bi-cup-hot', 'title': '晚餐', 'subtitle': '餐饮', 'location': '西湖区餐厅', 'cost': 60, 'type': 'meal', 'fixed': False, 'note': ''},
+        {'time': '19:00-', 'icon': 'bi-building', 'title': '返回酒店休息', 'subtitle': '住宿', 'location': '杭州西湖美居酒店', 'cost': 350, 'type': 'hotel', 'fixed': False, 'note': ''}
+    ],
+    '2026-08-12': [
+        {'time': '08:00-08:30', 'icon': 'bi-cup-straw', 'title': '早餐', 'subtitle': '餐饮', 'location': '酒店餐厅', 'cost': 20, 'type': 'meal', 'fixed': False, 'note': ''},
+        {'time': '12:00-13:00', 'icon': 'bi-cup-hot', 'title': '午餐', 'subtitle': '餐饮', 'location': '酒店附近', 'cost': 40, 'type': 'meal', 'fixed': False, 'note': ''},
+        {'time': '13:00-14:00', 'icon': 'bi-bus-front', 'title': '前往杭州东站', 'subtitle': '市内交通', 'location': '酒店→杭州东站', 'cost': 20, 'type': 'commute', 'fixed': False, 'note': '预留60分钟'},
+        {'time': '14:00-15:45', 'icon': 'bi-train-front', 'title': '杭州东 → 上海虹桥', 'subtitle': 'G7318', 'location': '杭州东站→上海虹桥站', 'cost': 120, 'type': 'transport', 'fixed': True, 'note': '返程交通'}
+    ]
+} %}
+
+{% set cost_summary = {
+    'transport_total': 240,
+    'hotel_total': 700,
+    'attraction_total': 0,
+    'meal_total': 240,
+    'commute_total': 100,
+    'total': 1280
+} %}
+
+{% set budget_status = 'within_budget' %}
+
+<!-- ========== 页面内容 ========== -->
+
+<!-- 行程摘要 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+                <h2 class="mb-1">
+                    <i class="bi bi-map text-primary me-2"></i>出差行程
+                </h2>
+                <p class="text-muted mb-0">
+                    <span class="badge bg-primary me-1">{{ trip.origin_city }}</span>
+                    <i class="bi bi-arrow-right mx-1"></i>
+                    <span class="badge bg-primary me-2">{{ trip.destination_city }}</span>
+                    <i class="bi bi-calendar3 me-1"></i>
+                    {{ trip.earliest_departure[:10] }} ~ {{ trip.latest_return[:10] }}
+                </p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('trips.edit', trip_id=trip.id) }}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-pencil me-1"></i>编辑
+                </a>
+                <form method="POST" action="{{ url_for('trips.regenerate', trip_id=trip.id) }}" class="d-inline">
+                    <button type="submit" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-arrow-clockwise me-1"></i>重新生成
+                    </button>
+                </form>
+                <form method="POST" action="{{ url_for('trips.delete', trip_id=trip.id) }}" class="d-inline" onsubmit="return confirm('确定删除此行程吗？')">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                        <i class="bi bi-trash me-1"></i>删除
+                    </button>
+                </form>
+            </div>
+        </div>
+        <hr>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- 左侧：交通 + 酒店 -->
+    <div class="col-lg-4">
+        <!-- 去程 -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-arrow-right-circle text-success me-2"></i>去程方案</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="badge bg-success">{{ transport_go.type }}</span>
+                    <small class="text-muted">{{ transport_go.name }}</small>
+                </div>
+                <p class="mb-1">
+                    <strong>{{ transport_go.departure[-8:-3] }}</strong> {{ transport_go.from }}
+                    <i class="bi bi-arrow-right mx-1"></i>
+                    <strong>{{ transport_go.arrival[-8:-3] }}</strong> {{ transport_go.to }}
+                </p>
+                <small class="text-muted">用时 {{ transport_go.duration }} | 票价 <strong>¥{{ transport_go.price }}</strong></small>
+            </div>
+        </div>
+
+        <!-- 返程 -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-arrow-left-circle text-info me-2"></i>返程方案</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="badge bg-info">{{ transport_back.type }}</span>
+                    <small class="text-muted">{{ transport_back.name }}</small>
+                </div>
+                <p class="mb-1">
+                    <strong>{{ transport_back.departure[-8:-3] }}</strong> {{ transport_back.from }}
+                    <i class="bi bi-arrow-right mx-1"></i>
+                    <strong>{{ transport_back.arrival[-8:-3] }}</strong> {{ transport_back.to }}
+                </p>
+                <small class="text-muted">用时 {{ transport_back.duration }} | 票价 <strong>¥{{ transport_back.price }}</strong></small>
+            </div>
+        </div>
+
+        <!-- 酒店 -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-building text-warning me-2"></i>推荐酒店</h6>
+            </div>
+            <div class="card-body">
+                <h6 class="mb-1">{{ hotel.name }}</h6>
+                <p class="mb-1">
+                    <span class="badge bg-warning text-dark me-1">
+                        <i class="bi bi-star-fill me-1"></i>{{ hotel.rating }}
+                    </span>
+                    <small class="text-muted">{{ hotel.area }} | 距市中心 {{ hotel.distance_to_city_center_km }}km</small>
+                </p>
+                <p class="mb-1"><strong>¥{{ hotel.nightly_price }}</strong><small class="text-muted"> / 晚</small></p>
+                <small class="text-muted">{{ hotel.description }}</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧：每日行程 -->
+    <div class="col-lg-8">
+        {% for date_str, items in daily_schedule.items() %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center
+                {% if day_types[date_str] == '出发日' %}bg-success text-white
+                {% elif day_types[date_str] == '会议加游玩' %}bg-primary text-white
+                {% elif day_types[date_str] == '返程日' %}bg-info text-white
+                {% else %}bg-secondary text-white{% endif %}">
+                <h5 class="mb-0">
+                    <i class="bi bi-calendar-day me-2"></i>{{ date_str }}
+                </h5>
+                <span class="badge bg-light text-dark">{{ day_types[date_str] }}</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="timeline">
+                    {% for item in items %}
+                    <div class="timeline-item border-bottom p-3 {% if item.fixed %}bg-light{% endif %}">
+                        <div class="row align-items-start">
+                            <div class="col-auto text-center" style="min-width: 80px;">
+                                <small class="text-muted d-block">{{ item.time }}</small>
+                            </div>
+                            <div class="col-auto text-center">
+                                <span class="badge rounded-circle p-2
+                                    {% if item.type == 'meeting' %}bg-danger
+                                    {% elif item.type == 'transport' %}bg-success
+                                    {% elif item.type == 'hotel' %}bg-warning text-dark
+                                    {% elif item.type == 'attraction' %}bg-info
+                                    {% elif item.type == 'meal' %}bg-secondary
+                                    {% else %}bg-secondary{% endif %}">
+                                    <i class="bi {{ item.icon }}"></i>
+                                </span>
+                            </div>
+                            <div class="col">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <strong>{{ item.title }}</strong>
+                                        {% if item.fixed %}
+                                        <span class="badge bg-danger ms-1" title="固定项目，不可自动修改">固定</span>
+                                        {% endif %}
+                                        <br>
+                                        <small class="text-muted">{{ item.subtitle }}</small>
+                                        {% if item.location %}
+                                        <br><small class="text-muted"><i class="bi bi-geo-alt me-1"></i>{{ item.location }}</small>
+                                        {% endif %}
+                                        {% if item.note %}
+                                        <br><small class="text-info"><i class="bi bi-info-circle me-1"></i>{{ item.note }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-end" style="min-width: 80px;">
+                                        {% if item.cost > 0 %}
+                                        <span class="badge bg-light text-dark">¥{{ item.cost }}</span>
+                                        {% endif %}
+                                        {% if not item.fixed and item.type not in ['hotel'] %}
+                                        <form method="POST" action="{{ url_for('itinerary.delete', item_id=loop.index) }}" class="d-inline ms-1">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-1" title="删除此项目">
+                                                <i class="bi bi-x"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- 费用明细 -->
+<div class="row mt-2">
+    <div class="col-lg-8 offset-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-calculator me-2"></i>费用明细</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-2">
+                    <div class="col-6 text-muted">去程交通</div>
+                    <div class="col-6 text-end">¥{{ cost_summary.transport_total }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-6 text-muted">返程交通</div>
+                    <div class="col-6 text-end">¥{{ cost_summary.transport_total }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-6 text-muted">酒店（2晚）</div>
+                    <div class="col-6 text-end">¥{{ cost_summary.hotel_total }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-6 text-muted">景点门票</div>
+                    <div class="col-6 text-end">¥{{ cost_summary.attraction_total }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-6 text-muted">餐饮估算</div>
+                    <div class="col-6 text-end">¥{{ cost_summary.meal_total }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-6 text-muted">市内交通</div>
+                    <div class="col-6 text-end">¥{{ cost_summary.commute_total }}</div>
+                </div>
+                <hr>
+                <div class="row mb-2">
+                    <div class="col-6"><strong>预计总费用</strong></div>
+                    <div class="col-6 text-end"><strong>¥{{ cost_summary.total }}</strong></div>
+                </div>
+                <div class="row">
+                    <div class="col-6">预算</div>
+                    <div class="col-6 text-end">¥{{ trip.budget }}</div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-12">
+                        <span class="badge bg-success fs-6 p-2">
+                            <i class="bi bi-check-circle me-1"></i>预算充足，剩余 ¥{{ trip.budget - cost_summary.total }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

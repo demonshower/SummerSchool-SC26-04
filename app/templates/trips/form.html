@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}新建行程{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <h2 class="mb-4">
+            <i class="bi bi-plus-circle text-primary me-2"></i>新建出差行程
+        </h2>
+        <p class="text-muted mb-4">填写出差基本信息，系统将为您自动规划完整的行程安排。</p>
+
+        <form id="tripForm" method="POST" action="{{ url_for('trips.create') }}" novalidate>
+            <!-- 基础信息 -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>基础信息</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="origin_city" class="form-label">出发城市 <span class="text-danger">*</span></label>
+                            <select class="form-select" id="origin_city" name="origin_city" required>
+                                <option value="">请选择出发城市</option>
+                                <option value="上海">上海</option>
+                                <option value="杭州">杭州</option>
+                                <option value="南京">南京</option>
+                                <option value="苏州">苏州</option>
+                                <option value="北京">北京</option>
+                            </select>
+                            <div class="invalid-feedback">请选择出发城市</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="destination_city" class="form-label">出差城市 <span class="text-danger">*</span></label>
+                            <select class="form-select" id="destination_city" name="destination_city" required>
+                                <option value="">请选择出差城市</option>
+                                <option value="杭州">杭州</option>
+                                <option value="上海">上海</option>
+                                <option value="南京">南京</option>
+                                <option value="苏州">苏州</option>
+                                <option value="北京">北京</option>
+                            </select>
+                            <div class="invalid-feedback">请选择出差城市</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="earliest_departure" class="form-label">最早出发时间 <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control" id="earliest_departure" name="earliest_departure" required>
+                            <div class="invalid-feedback">请选择最早出发时间</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="latest_return" class="form-label">最晚返程时间 <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control" id="latest_return" name="latest_return" required>
+                            <div class="invalid-feedback">请选择最晚返程时间</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="budget" class="form-label">总预算（元） <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">¥</span>
+                                <input type="number" class="form-control" id="budget" name="budget" min="1" step="0.01" required>
+                            </div>
+                            <div class="invalid-feedback">请输入有效的预算金额</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="transport_preference" class="form-label">交通偏好</label>
+                            <select class="form-select" id="transport_preference" name="transport_preference">
+                                <option value="any">不限</option>
+                                <option value="flight">飞机</option>
+                                <option value="train">高铁</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="hotel_max_price" class="form-label">酒店最高价（元/晚） <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">¥</span>
+                                <input type="number" class="form-control" id="hotel_max_price" name="hotel_max_price" min="1" step="0.01" required>
+                            </div>
+                            <div class="invalid-feedback">请输入有效的酒店最高价格</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 游玩偏好 -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-heart me-2"></i>游玩偏好</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="wants_sightseeing" name="wants_sightseeing" value="1" checked>
+                                <label class="form-check-label" for="wants_sightseeing">安排游玩活动</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="attraction_preference" class="form-label">景点偏好</label>
+                            <select class="form-select" id="attraction_preference" name="attraction_preference">
+                                <option value="any">不限</option>
+                                <option value="自然">自然风光</option>
+                                <option value="人文">人文历史</option>
+                                <option value="商业">商业购物</option>
+                                <option value="美食">美食体验</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="pace" class="form-label">行程强度</label>
+                            <select class="form-select" id="pace" name="pace">
+                                <option value="轻松">轻松（每天最多1个景点）</option>
+                                <option value="紧凑">紧凑（可安排2个景点）</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 会议列表 -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-calendar-event me-2"></i>会议安排 <span class="text-danger">*</span></h5>
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="addMeetingBtn">
+                        <i class="bi bi-plus-lg me-1"></i>添加会议
+                    </button>
+                </div>
+                <div class="card-body" id="meetingsContainer">
+                    <!-- 默认第一场会议 -->
+                    <div class="meeting-item border rounded p-3 mb-3 position-relative">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge bg-primary">会议 #1</span>
+                            <button type="button" class="btn btn-outline-danger btn-sm remove-meeting" style="display:none;">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label">会议日期 <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control meeting-date" name="meeting_dates" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">开始时间 <span class="text-danger">*</span></label>
+                                <input type="time" class="form-control meeting-start" name="meeting_starts" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">结束时间 <span class="text-danger">*</span></label>
+                                <input type="time" class="form-control meeting-end" name="meeting_ends" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">地点 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control meeting-location" name="meeting_locations" placeholder="如：西湖区" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="meetingError" class="alert alert-danger d-none mx-3 mb-3"></div>
+            </div>
+
+            <!-- 提交按钮 -->
+            <div class="d-flex justify-content-between mb-5">
+                <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i>返回首页
+                </a>
+                <button type="submit" class="btn btn-primary btn-lg px-5" id="submitBtn">
+                    <i class="bi bi-magic me-2"></i>开始规划
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/trip_form.js') }}"></script>
+{% endblock %}

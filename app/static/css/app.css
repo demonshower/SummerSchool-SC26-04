@@ -1,0 +1,179 @@
+/* ========================================
+   出差行程规划助手 - 自定义样式
+   ======================================== */
+
+/* 整体布局 */
+html, body {
+    height: 100%;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    background-color: #f8f9fa;
+}
+
+main {
+    flex: 1;
+}
+
+/* 导航栏 */
+.navbar-brand {
+    letter-spacing: 0.5px;
+}
+
+.navbar .nav-link {
+    transition: opacity 0.2s;
+}
+
+.navbar .nav-link:hover {
+    opacity: 0.85;
+}
+
+/* 首页 Hero */
+.display-4 {
+    font-weight: 700;
+}
+
+/* 卡片悬浮效果 */
+.card {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    border-radius: 0.5rem;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08) !important;
+}
+
+.card-header {
+    border-radius: 0.5rem 0.5rem 0 0 !important;
+}
+
+/* 时间线样式 */
+.timeline .timeline-item:last-child {
+    border-bottom: none !important;
+}
+
+.timeline .timeline-item:hover {
+    background-color: #f8f9fa;
+}
+
+.timeline .timeline-item .badge.rounded-circle {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+}
+
+/* 会议区块样式 */
+.meeting-item {
+    transition: background-color 0.15s ease;
+}
+
+.meeting-item:hover {
+    background-color: #f8f9fa;
+}
+
+/* 表单样式 */
+.form-label {
+    font-weight: 500;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+}
+
+/* 固定项目标记 */
+.badge.bg-danger[title="固定项目，不可自动修改"] {
+    font-size: 0.7rem;
+    vertical-align: middle;
+}
+
+/* 日期类型颜色 */
+.bg-date-departure {
+    background-color: #28a745;
+}
+
+.bg-date-meeting {
+    background-color: #0d6efd;
+}
+
+.bg-date-play {
+    background-color: #20c997;
+}
+
+.bg-date-meeting-play {
+    background-color: #6f42c1;
+}
+
+.bg-date-return {
+    background-color: #0dcaf0;
+}
+
+/* 费用明细 */
+.card .row.mb-2 {
+    font-size: 0.95rem;
+}
+
+/* 预算状态徽标 */
+.badge.fs-6 {
+    font-weight: 500;
+}
+
+/* 空状态样式 */
+.display-1.text-muted {
+    opacity: 0.5;
+}
+
+/* 历史行程卡片 */
+.card-title .badge {
+    font-size: 0.85rem;
+    padding: 0.35em 0.65em;
+}
+
+/* 编辑页酒店选择 */
+.form-check.border.rounded.p-3 {
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.form-check.border.rounded.p-3:hover {
+    border-color: #0d6efd;
+    background-color: #f0f7ff;
+}
+
+.form-check-input:checked + .form-check-label {
+    font-weight: 500;
+}
+
+/* 按钮间距 */
+.btn + .btn {
+    margin-left: 0.25rem;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .display-4 {
+        font-size: 2rem;
+    }
+
+    .timeline .timeline-item .col-auto[style*="min-width: 80px"] {
+        min-width: 60px !important;
+    }
+}
+
+/* 打印样式 */
+@media print {
+    .navbar, .footer, .btn, form {
+        display: none !important;
+    }
+    .card {
+        break-inside: avoid;
+        box-shadow: none !important;
+        border: 1px solid #dee2e6;
+    }
+    .card-header {
+        background-color: #f8f9fa !important;
+    }
+}

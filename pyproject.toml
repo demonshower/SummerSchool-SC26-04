@@ -1,0 +1,23 @@
+[project]
+name = "summerschool-sc26-04"
+version = "0.1.0"
+description = "SummerSchool SC26-04 project"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "flask==3.1.0",
+    "flask-sqlalchemy==3.1.1",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.2.0",
+    "ruff>=0.12.0",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]

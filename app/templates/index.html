@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}出差行程规划助手 - 首页{% endblock %}
+
+{% block content %}
+<div class="row min-vh-75">
+    <!-- Hero 区域 -->
+    <div class="col-12 text-center py-5">
+        <h1 class="display-4 fw-bold text-primary mb-3">
+            <i class="bi bi-compass"></i> 出差行程规划助手
+        </h1>
+        <p class="lead text-muted mb-4 mx-auto" style="max-width: 600px;">
+            只需填写出差信息，系统自动为您推荐交通、酒店和景点，
+            生成完整的每日行程与预算分析。
+        </p>
+        <div class="d-flex justify-content-center gap-3 mb-5">
+            <a href="{{ url_for('trips.new') }}" class="btn btn-primary btn-lg px-4">
+                <i class="bi bi-plus-circle me-2"></i>开始规划
+            </a>
+            <a href="{{ url_for('trips.list') }}" class="btn btn-outline-primary btn-lg px-4">
+                <i class="bi bi-clock-history me-2"></i>历史行程
+            </a>
+        </div>
+    </div>
+
+    <!-- 功能卡片 -->
+    <div class="col-12">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card border-primary h-100 shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <div class="display-6 text-primary mb-3">
+                            <i class="bi bi-calendar-check"></i>
+                        </div>
+                        <h5 class="card-title">会议时间分析</h5>
+                        <p class="card-text text-muted">
+                            支持多场会议，自动划分出发日、会议日、游玩日和返程日，
+                            计算会议前后的空闲时间。
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-success h-100 shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <div class="display-6 text-success mb-3">
+                            <i class="bi bi-geo-alt"></i>
+                        </div>
+                        <h5 class="card-title">空闲时间游玩</h5>
+                        <p class="card-text text-muted">
+                            根据空闲时间长短和您的偏好，智能推荐合适的景点，
+                            让出差之余也能放松身心。
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-warning h-100 shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <div class="display-6 text-warning mb-3">
+                            <i class="bi bi-wallet2"></i>
+                        </div>
+                        <h5 class="card-title">预算统计</h5>
+                        <p class="card-text text-muted">
+                            自动汇总交通、酒店、门票、餐饮等费用，
+                            实时提示预算状态，超预算时自动降级优化。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速开始 -->
+    <div class="col-12 mt-5">
+        <div class="card bg-light border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h5 class="mb-3"><i class="bi bi-rocket-takeoff me-2"></i>快速开始</h5>
+                <ol class="mb-0">
+                    <li class="mb-2">点击「开始规划」，填写出差城市、时间和会议信息</li>
+                    <li class="mb-2">系统自动分析日期类型，推荐交通、酒店和景点</li>
+                    <li class="mb-2">查看完整的每日时间轴和费用明细</li>
+                    <li class="mb-2">按需调整行程项目，系统自动重新计算预算</li>
+                    <li>随时从「历史行程」回顾已保存的出差计划</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
