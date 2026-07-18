@@ -1,8 +1,10 @@
 # 出差行程规划助手 — 前端
 
-Next.js App Router 前端，对接 NestJS 后端 REST API，实现出差行程的创建、自动规划、编辑、报价比价与攻略导入。
+Next.js App Router 前端，对接 NestJS 后端 REST API。
 
-> 由旧版 Flask SSR 前端（`SummerSchool-SC26-04/`）迁移而来，前后端完全分离。
+当前版本已对接：**分段并行 LLM 规划、高德地图/天气、博查攻略研究、自然语言填表、地点搜索、报价比价、攻略导入** 等能力。
+
+> 由旧版 Flask SSR（`SummerSchool-SC26-04/`）迁移而来，前后端完全分离。
 
 ---
 
@@ -12,12 +14,14 @@ Next.js App Router 前端，对接 NestJS 后端 REST API，实现出差行程�
 2. [项目结构](#2-项目结构)
 3. [环境要求](#3-环境要求)
 4. [启动方式](#4-启动方式)
-5. [从旧 Flask 前端迁移说明](#5-从旧-flask-前端迁移说明)
-6. [功能与页面](#6-功能与页面)
+5. [功能与页面](#5-功能与页面)
+6. [与后端能力对照](#6-与后端能力对照)
 7. [API 对接约定](#7-api-对接约定)
 8. [认证流程](#8-认证流程)
-9. [常用命令](#9-常用命令)
-10. [常见问题](#10-常见问题)
+9. [规划流程（前端侧）](#9-规划流程前端侧)
+10. [从旧 Flask 迁移](#10-从旧-flask-迁移)
+11. [常用命令](#11-常用命令)
+12. [常见问题](#12-常见问题)
 
 ---
 
@@ -29,8 +33,8 @@ Next.js App Router 前端，对接 NestJS 后端 REST API，实现出差行程�
 | UI | Bootstrap 5.3 + Bootstrap Icons |
 | 数据获取 | TanStack Query v5 |
 | 表单 | React Hook Form |
-| 状态管理 | Zustand（认证状态持久化） |
-| HTTP | Axios |
+| 状态管理 | Zustand（认证持久化） |
+| HTTP | Axios（超时 120s，自动解包 `{ data }`） |
 | 工具 | date-fns |
 
 ---
@@ -40,110 +44,74 @@ Next.js App Router 前端，对接 NestJS 后端 REST API，实现出差行程�
 ```
 frontend/
 ├── src/
-│   ├── app/                          # 页面路由 (App Router)
-│   │   ├── layout.tsx                # 根布局 (Bootstrap + Providers)
-│   │   ├── page.tsx                  # 首页 /
-│   │   ├── globals.css               # 全局样式
-│   │   ├── auth/
-│   │   │   ├── login/page.tsx        # 登录
-│   │   │   └── register/page.tsx     # 注册
+│   ├── app/
+│   │   ├── page.tsx                  # 首页
+│   │   ├── auth/login|register       # 登录 / 注册
 │   │   └── trips/
-│   │       ├── page.tsx              # 行程列表
-│   │       ├── new/page.tsx          # 新建行程
+│   │       ├── page.tsx              # 列表
+│   │       ├── new/page.tsx          # 新建（NL 填表 + 会议地点搜索 + autoPlan）
 │   │       └── [tripId]/
-│   │           ├── page.tsx          # 行程详情
-│   │           └── edit/page.tsx     # 编辑行程
-│   │
+│   │           ├── page.tsx          # 详情（规划进度/天气/通勤/研究/比价/导入）
+│   │           └── edit/page.tsx     # 编辑
 │   ├── components/
-│   │   ├── layout/                   # Navbar, Footer, BootstrapClient
+│   │   ├── layout/                   # Navbar, Footer
 │   │   ├── auth/                     # AuthGuard
-│   │   ├── quotes/                   # QuotePanel 报价比价
-│   │   ├── content/                  # GuideImporter 攻略导入
-│   │   └── itinerary/                # ItemEditor 活动项编辑
-│   │
-│   ├── lib/
-│   │   ├── api/                      # API 客户端层
-│   │   │   ├── client.ts             # Axios 实例 / JWT / 错误处理
-│   │   │   ├── auth.ts
-│   │   │   ├── trips.ts
-│   │   │   ├── itinerary.ts
-│   │   │   ├── planning.ts
-│   │   │   ├── quotes.ts
-│   │   │   ├── content.ts
-│   │   │   └── places.ts
-│   │   └── utils/
-│   │       ├── money.ts              # 分 ↔ 元
-│   │       └── date.ts               # 日期格式化
-│   │
-│   ├── stores/
-│   │   └── authStore.ts              # 认证状态 (Zustand + localStorage)
-│   ├── types/                        # TypeScript 类型
-│   └── providers/
-│       └── QueryProvider.tsx         # TanStack Query
-│
-├── .env.local                        # 环境变量 (不入库)
-├── package.json
-├── next.config.ts
-└── tsconfig.json
+│   │   ├── trips/NaturalLanguageInput.tsx   # 自然语言解析填表
+│   │   ├── places/PlacePicker.tsx           # 高德地点搜索
+│   │   ├── weather/WeatherCard.tsx          # 天气卡片
+│   │   ├── planning/PlanProgress.tsx        # 规划阶段进度
+│   │   ├── research/ResearchPanel.tsx       # 博查攻略研究
+│   │   ├── content/GuideImporter.tsx        # 文本/链接导入
+│   │   ├── quotes/QuotePanel.tsx            # 报价比价
+│   │   └── itinerary/ItemEditor.tsx         # 活动项编辑
+│   ├── lib/api/
+│   │   ├── client.ts                 # Axios + JWT + 错误归一
+│   │   ├── auth.ts / trips.ts / itinerary.ts
+│   │   ├── planning.ts               # 规划 + waitUntilDone 轮询
+│   │   ├── quotes.ts / content.ts / places.ts
+│   │   └── research.ts               # 攻略研究
+│   ├── stores/authStore.ts
+│   └── types/
+├── .env.local
+└── package.json
 ```
 
 ---
 
 ## 3. 环境要求
 
-| 依赖 | 最低版本 | 说明 |
-|------|---------|------|
-| Node.js | v20+ | 推荐 v22 LTS |
-| npm | v10+ | 随 Node.js 安装 |
-| 后端 API | — | 需先启动 NestJS 后端（默认 `http://localhost:8080`） |
+| 依赖 | 说明 |
+|------|------|
+| Node.js v20+ | 推荐 v22 |
+| npm v10+ | |
+| 后端 API | 默认 `http://localhost:8080`，需已配置高德 / LLM / 博查等（见后端文档） |
 
 ---
 
 ## 4. 启动方式
 
-### 4.1 前置：启动后端
-
-前端依赖后端 API，请先在另一个终端启动后端：
+### 4.1 启动后端
 
 ```bash
 cd backend
 docker compose up -d
-# 若首次启动，还需初始化数据库（见 backend/doc/deployment.md）
+# 首次需初始化库表与种子数据，见 backend/doc/deployment.md
+curl http://localhost:8080/api/v1/providers/health
 ```
 
-验证后端：
-
-```bash
-curl http://localhost:8080/api/v1/places/cities
-# 应返回 15 个城市的 JSON
-```
-
-### 4.2 安装依赖
+### 4.2 启动前端
 
 ```bash
 cd frontend
 npm install
-```
-
-### 4.3 配置环境变量
-
-项目已包含 `.env.local`，默认内容：
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
-```
-
-如后端地址不同，请修改该文件。
-
-### 4.4 开发模式启动
-
-```bash
+# .env.local
+# NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
 npm run dev
 ```
 
-浏览器访问：**http://localhost:3000**
+浏览器打开 **http://localhost:3000**
 
-### 4.5 生产构建
+### 4.3 生产构建
 
 ```bash
 npm run build
@@ -152,245 +120,169 @@ npm start
 
 ---
 
-## 5. 从旧 Flask 前端迁移说明
+## 5. 功能与页面
 
-### 5.1 背景
+| 路径 | 功能 |
+|------|------|
+| `/` | 产品介绍、入口 |
+| `/auth/login` | 登录 / 游客 |
+| `/auth/register` | 注册 |
+| `/trips` | 行程列表（状态徽章：草稿/已规划等） |
+| `/trips/new` | 智能填写（NL）+ 表单 + 会议地点高德搜索 + **创建并自动规划** |
+| `/trips/[id]` | 详情：规划进度、天气、通勤、AI 说明、日程、比价、导入、研究 |
+| `/trips/[id]/edit` | 编辑偏好并重新规划 |
 
-旧前端位于 `SummerSchool-SC26-04/`（Flask + Jinja2 SSR），存在以下问题：
+### 详情页能力
 
-- 全部页面硬编码数据，无真实 API
-- 无用户认证
-- 无法对接 NestJS 后端
-- 前后端耦合，无法独立部署
-
-新前端位于 `frontend/`，已完整迁移并扩展。
-
-### 5.2 页面对照表
-
-| 旧 Flask 路由 | 新 Next.js 路由 | 变化 |
-|--------------|----------------|------|
-| `GET /` | `/` | 保留 Hero + 功能卡片，按钮按登录状态跳转 |
-| — | `/auth/login` | **新增** 登录 + 游客模式 |
-| — | `/auth/register` | **新增** 注册 |
-| `GET /trips` | `/trips` | 从硬编码改为 `GET /api/v1/trips` |
-| `GET /trips/new` | `/trips/new` | 表单字段对齐后端 DTO，金额改用「分」 |
-| `POST /trips` | （前端调 API） | 创建后跳转详情，可触发自动规划 |
-| `GET /trips/:id` | `/trips/[tripId]` | 真实数据 + 时间线 + 费用汇总 |
-| `GET /trips/:id/edit` | `/trips/[tripId]/edit` | 预填表单 + 保存/重新规划 |
-| — | 详情页内「比价」 | **新增** 报价搜索/刷新/深链 |
-| — | 详情页内「攻略」 | **新增** 文本/链接导入与地点抽取 |
-| — | 详情页内活动项编辑 | **新增** 增删改、锁定/解锁 |
-
-### 5.3 数据字段映射
-
-| 旧前端字段 | 新前端 / 后端字段 | 说明 |
-|-----------|------------------|------|
-| `origin_city` | `originCity` | 驼峰命名 |
-| `destination_city` | `destinationCity` | |
-| `budget`（元） | `budgetMinor`（分） | UI 仍显示元，提交时 ×100 |
-| `hotel_max_price` | `hotelMaxPriceMinor` | 同上 |
-| `transport_preference: "高铁"` | `"train"` | 使用英文枚举 |
-| `pace: "轻松"` | `"relaxed"` | `relaxed` / `balanced` / `intense` |
-| `meeting_dates[]` 等 | `meetings: [{ title, meetingDate, startTime, endTime, location }]` | 结构化对象数组 |
-
-### 5.4 技术迁移要点
-
-| 项 | 旧方案 | 新方案 |
-|----|--------|--------|
-| 渲染 | Jinja2 服务端渲染 | Next.js 客户端组件 + API |
-| 状态 | 无 | Zustand（认证）+ TanStack Query（服务端数据） |
-| 表单 | 原生 form POST | React Hook Form |
-| 样式 | Bootstrap CDN | Bootstrap npm 包 |
-| 认证 | 无 | JWT Bearer，localStorage 持久化 |
-| 金额 | 浮点「元」 | 整数「分」，工具函数转换 |
-| 部署 | 与后端同进程 | 独立端口 `:3000`，CORS 跨域 |
-
-### 5.5 迁移后旧前端如何处理
-
-- 旧 Flask 代码仍保留在 `SummerSchool-SC26-04/`，仅作参考
-- **日常开发与演示请使用 `frontend/`**
-- 后端文档：`backend/doc/api-v1.md`、`backend/doc/deployment.md`
+| 按钮/区域 | 能力 |
+|-----------|------|
+| 重新规划 | `POST .../planning/plan` 后轮询 `status`，展示 `PlanProgress` |
+| 比价 | `QuotePanel`：火车/飞机/酒店/门票搜索与刷新 |
+| 导入 | `GuideImporter`：文本/链接导入（后端 LLM 抽取） |
+| 研究 | `ResearchPanel`：博查多查询 + 洞察地点 + 来源列表 |
+| 天气 | `WeatherCard` → `GET /providers/weather` |
+| 通勤 | 展示 `planVersions.evidence.routeHints` |
+| 日程编辑 | 增删改、锁定活动项 |
 
 ---
 
-## 6. 功能与页面
+## 6. 与后端能力对照
 
-### 6.1 页面一览
+| 后端能力 | 前端入口 | 状态 |
+|----------|----------|------|
+| 分段并行 LLM 规划 + job 进度 | 新建 autoPlan / 详情重新规划 + PlanProgress | ✅ |
+| 高德 POI / 天气 / 路线 | PlacePicker、WeatherCard、通勤列表；规划结果内嵌 | ✅ |
+| ECNU LLM 解析 / 抽取 / 解释 | NL 填表、导入、方案说明 | ✅ |
+| 博查攻略研究 | 详情「研究」 | ✅ |
+| 报价 | 比价面板 | ✅（多为 Mock/估算票价） |
+| 行程 CRUD / 日程编辑 | 列表、新建、详情、编辑 | ✅ |
 
-| 路径 | 功能 | 需登录 |
-|------|------|--------|
-| `/` | 首页：产品介绍、开始规划 | 否 |
-| `/auth/login` | 登录 / 游客模式 | 否 |
-| `/auth/register` | 注册 | 否 |
-| `/trips` | 历史行程列表 | 是 |
-| `/trips/new` | 新建行程表单（城市、日期、预算、会议） | 是 |
-| `/trips/[id]` | 行程详情：时间线、费用、规划、比价、攻略、活动项编辑 | 是 |
-| `/trips/[id]/edit` | 编辑行程偏好并保存 / 重新规划 | 是 |
-
-### 6.2 详情页能力
-
-- **重新规划**：调用自动规划引擎，生成交通/酒店/活动时间线
-- **报价比价**：火车 / 飞机 / 酒店 / 门票，多平台 Mock 报价对比、刷新、跳转预订
-- **攻略导入**：粘贴文本或链接，抽取地点（置信度、情感、建议时长）
-- **活动项**：按天新增 / 编辑 / 删除 / 锁定 / 解锁
-
-### 6.3 API 覆盖（33 个接口）
-
-| 模块 | 覆盖 |
-|------|------|
-| 认证 (4) | ✅ 注册 / 登录 / 游客 / 当前用户 |
-| 旅行 (5) | ✅ CRUD + 列表 |
-| 行程编辑 (7) | ✅ 增删改 / 锁定等 |
-| 自动规划 (4) | ✅ 触发规划 |
-| 报价 (4) | ✅ 搜索 / 列表 / 刷新 / 深链 |
-| 攻略 (6) | ✅ 文本导入 / 链接导入 / 结果展示 |
-| 地点 (3) | ✅ 城市列表（表单下拉） |
+接口细节见：`backend/doc/api-v1.md`、`backend/doc/providers.md`。
 
 ---
 
 ## 7. API 对接约定
 
-### 7.1 基础配置
-
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
 ```
 
-### 7.2 响应解包
+| 约定 | 说明 |
+|------|------|
+| 响应 | 拦截器解包 `response.data.data` |
+| 错误 | `{ error: { code, message, details } }`；校验数组会拼成中文 |
+| 金额 | UI 用「元」，请求用 `*Minor` 分；`money.ts` |
+| 时间 | `datetime-local` 转 `...+08:00` 再提交 |
+| 超时 | 默认 120s（规划/研究较慢） |
+| 认证 | `Authorization: Bearer <token>`，存 `localStorage` 键 `auth-storage` |
 
-后端统一返回：
+### 关键请求示例
+
+**创建并自动规划：**
 
 ```json
-{ "data": { ... }, "meta": { "requestId": "...", "timestamp": "..." } }
+POST /trips
+{
+  "originCity": "上海",
+  "destinationCity": "杭州",
+  "startDate": "2026-08-10",
+  "endDate": "2026-08-12",
+  "earliestDeparture": "2026-08-10T13:00:00+08:00",
+  "latestReturn": "2026-08-12T21:00:00+08:00",
+  "budgetMinor": 300000,
+  "hotelMaxPriceMinor": 40000,
+  "transportPreference": "train",
+  "meetings": [{ "title": "项目会", "meetingDate": "2026-08-11", "startTime": "09:00", "endTime": "12:00", "location": "西湖区" }],
+  "autoPlan": true,
+  "planStrategy": "balanced"
+}
 ```
 
-Axios 拦截器自动解包为业务数据 `data`，页面代码直接使用对象字段。
+**仅触发规划（异步 job）：**
 
-### 7.3 错误格式
+```http
+POST /trips/:id/planning/plan
+→ { jobId, status: "queued", stages: [...] }
 
-```json
-{ "error": { "code": "TRIP_NOT_FOUND", "message": "..." } }
+GET /trips/:id/planning/status
+→ { tripStatus, job: { progress, stages, status } }
 ```
-
-401 时自动清除 token 并跳转 `/auth/login`。
-
-### 7.4 金额
-
-| 层 | 单位 | 示例 |
-|----|------|------|
-| UI 展示 / 输入 | 元 | `¥2000` |
-| API 传输 | 分（整数） | `200000` |
-
-工具函数：`src/lib/utils/money.ts`（`fenToYuan` / `yuanToFen` / `formatMoney`）。
 
 ---
 
 ## 8. 认证流程
 
 ```
-未登录访问 /trips
-    → AuthGuard 拦截
-    → /auth/login
-
-登录 / 注册 / 游客登录
-    → 获得 accessToken + user
-    → Zustand 写入 localStorage (auth-storage)
-    → 跳转 /trips
-
-后续请求
-    → Axios 拦截器附加 Authorization: Bearer <token>
-
-401
-    → 清除本地认证
-    → 跳转 /auth/login
+未登录 → AuthGuard → /auth/login
+登录/注册/游客 → token 写入 Zustand + localStorage
+请求自动带 Bearer
+401 → 清 token → 回登录页
 ```
 
 ---
 
-## 9. 常用命令
+## 9. 规划流程（前端侧）
+
+```text
+新建页提交 (autoPlan=true)
+    → 后端创建行程 + 后台分段规划 + wait 完成后返回详情
+    → 跳转详情页（已有 days/items）
+
+详情页「重新规划」
+    → POST plan 立即返回 jobId
+    → 每秒轮询 status，更新 PlanProgress
+    → ready 后 invalidate 行程详情
+
+旧草稿无日程进入详情
+    → 自动触发一次规划轮询
+```
+
+后端阶段大致为：`context → candidates → transport/hotel → days → persist → commute → explain`。
+
+---
+
+## 10. 从旧 Flask 迁移
+
+| 旧 | 新 |
+|----|-----|
+| Jinja SSR + 硬编码 | Next.js + 真实 API |
+| 无认证 | JWT |
+| 无规划 | 分段 LLM + 高德 |
+| 金额「元」浮点 | 分整数 |
+
+旧代码仅作参考，日常开发使用本目录。
+
+---
+
+## 11. 常用命令
 
 ```bash
-# 开发
-npm run dev          # http://localhost:3000
-
-# 构建与生产启动
-npm run build
-npm start
-
-# 代码检查
+npm run dev
+npm run build && npm start
 npm run lint
 ```
 
-### 与后端联调
-
-```bash
-# 终端 1 — 后端
-cd backend && docker compose up -d
-
-# 终端 2 — 前端
-cd frontend && npm run dev
-```
+联调：
 
 | 服务 | 地址 |
 |------|------|
 | 前端 | http://localhost:3000 |
-| 后端 API | http://localhost:8080/api/v1 |
+| API | http://localhost:8080/api/v1 |
 | Swagger | http://localhost:8080/api/docs |
+| Providers 健康 | http://localhost:8080/api/v1/providers/health |
 
 ---
 
-## 10. 常见问题
+## 12. 常见问题
 
-### Q1: 页面一直跳转到登录
-
-确认：
-
-1. 后端是否已启动（`http://localhost:8080/api/v1/places/cities`）
-2. `.env.local` 中 `NEXT_PUBLIC_API_URL` 是否正确
-3. 浏览器控制台是否有 CORS / 网络错误
-
-### Q2: 注册/登录成功但刷新后丢失
-
-认证依赖 `localStorage` 的 `auth-storage`。请勿使用隐私模式或手动清空存储。
-
-### Q3: 创建行程后详情为空
-
-创建后需在详情页点击 **「重新规划」**，才会生成每日时间线与费用汇总。
-
-### Q4: 报价/攻略按钮无数据
-
-- 报价为 Mock 数据，需先点 **「搜索报价」**
-- 攻略导入需粘贴包含已知地点名（如西湖、灵隐寺）的中文文本
-
-### Q5: 端口 3000 被占用
-
-```bash
-# 使用其他端口
-npx next dev -p 3001
-```
-
-并相应调整后端 CORS（`CORS_ORIGIN`）。
-
-### Q6: 构建失败
-
-```bash
-rm -rf .next node_modules
-npm install
-npm run build
-```
-
----
-
-## 快速启动清单
-
-```
-□ 1. 后端已启动 (docker compose up -d)
-□ 2. cd frontend && npm install
-□ 3. 确认 .env.local 中 API 地址
-□ 4. npm run dev
-□ 5. 打开 http://localhost:3000
-□ 6. 注册 / 登录 → 新建行程 → 重新规划 → 查看详情
-```
+| 问题 | 处理 |
+|------|------|
+| 一直跳登录 | 确认后端已启动、CORS、API URL |
+| 规划很久 | 正常（多段 LLM+地图）；看进度条；超时 180s |
+| 会议提交失败 | 日期/开始/结束/地点须齐全，或清空该行 |
+| 详情只有费用 | 点「立即规划」；新建请带 autoPlan |
+| 地点/天气失败 | 检查后端高德 Web 服务 Key |
+| 研究无结果 | 检查博查 Key；`providers/health` 中 bocha.enabled |
 
 ---
 
@@ -398,11 +290,9 @@ npm run build
 
 | 文档 | 路径 |
 |------|------|
-| 后端接口文档 | `backend/doc/api-v1.md` |
-| 后端部署指南 | `backend/doc/deployment.md` |
-| 产品设计文档 | `docs/` |
+| 后端接口 | `backend/doc/api-v1.md` |
+| 外部服务 | `backend/doc/providers.md` |
+| 部署 | `backend/doc/deployment.md` |
+| 产品 V2 需求 | `docs/intelligent-travel-planning-requirements.md` |
 
----
-
-**版本：** V1.0  
-**最后更新：** 2026-07-18
+**版本：** V1.2 · **更新：** 2026-07-18 · **分支：** `v1frontend`
