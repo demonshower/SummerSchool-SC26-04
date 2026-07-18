@@ -137,6 +137,9 @@ export interface CreateTripDto {
   pace?: string;
   title?: string;
   meetings?: CreateMeetingDto[];
+  /** 创建后立即自动规划 */
+  autoPlan?: boolean;
+  planStrategy?: string;
 }
 
 export interface CreateMeetingDto {

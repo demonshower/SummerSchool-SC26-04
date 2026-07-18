@@ -4,7 +4,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/a
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  // 规划/研究可能较慢（高德+LLM）
+  timeout: 120000,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -23,11 +24,28 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor — unwrap { data } and handle errors
+// Response interceptor — unwrap { data } and normalize errors
 apiClient.interceptors.response.use(
   (response) => response.data.data,
   (error) => {
-    const apiError = error.response?.data?.error || { code: 'NETWORK_ERROR', message: error.message };
+    const payload = error.response?.data;
+    let apiError = payload?.error || { code: 'NETWORK_ERROR', message: error.message };
+
+    // Nest validation sometimes returns message as array
+    if (Array.isArray(apiError.message)) {
+      apiError = {
+        ...apiError,
+        message: apiError.message.join('；'),
+        details: { validation: apiError.message, ...(apiError.details || {}) },
+      };
+    } else if (Array.isArray(payload?.message)) {
+      apiError = {
+        code: apiError.code || 'INVALID_INPUT',
+        message: payload.message.join('；'),
+        details: { validation: payload.message },
+      };
+    }
+
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       localStorage.removeItem('auth-storage');
       if (!window.location.pathname.startsWith('/auth')) {

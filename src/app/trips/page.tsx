@@ -41,7 +41,9 @@ export default function TripListPage() {
                           <i className="bi bi-arrow-right"></i>
                           <span className="badge bg-primary ms-1">{t.destinationCity}</span>
                         </h5>
-                        <span className="badge bg-info">{t.status}</span>
+                        <span className={`badge ${t.status === 'ready' ? 'bg-success' : t.status === 'draft' ? 'bg-secondary' : 'bg-info'}`}>
+                          {{ draft: '草稿', planning: '规划中', ready: '已规划', confirmed: '已确认', archived: '已归档' }[t.status as string] || t.status}
+                        </span>
                       </div>
                       <p className="text-muted small mb-2">
                         <i className="bi bi-calendar3 me-1"></i>{formatDate(t.startDate)} ~ {formatDate(t.endDate)}
