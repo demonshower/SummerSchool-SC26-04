@@ -6,31 +6,32 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateMeetingDto {
-  @ApiProperty({ example: '项目研讨会' })
+  @ApiPropertyOptional({ example: '项目研讨会' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(200)
-  title: string;
+  title?: string;
 
-  @ApiProperty({ example: '2026-08-11' })
+  @ApiPropertyOptional({ example: '2026-08-11' })
+  @IsOptional()
   @IsDateString()
-  meetingDate: string;
+  meetingDate?: string;
 
-  @ApiProperty({ example: '09:00' })
+  @ApiPropertyOptional({ example: '09:00' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  startTime: string;
+  startTime?: string;
 
-  @ApiProperty({ example: '12:00' })
+  @ApiPropertyOptional({ example: '12:00' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  endTime: string;
+  endTime?: string;
 
-  @ApiProperty({ example: '杭州市西湖区' })
+  @ApiPropertyOptional({ example: '杭州市西湖区' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(200)
-  location: string;
+  location?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -120,6 +121,19 @@ export class CreateTripDto {
   @ValidateNested({ each: true })
   @Type(() => CreateMeetingDto)
   meetings?: CreateMeetingDto[];
+
+  @ApiPropertyOptional({
+    default: false,
+    description: '创建后是否立即自动规划（生成日程）',
+  })
+  @IsOptional()
+  @IsBoolean()
+  autoPlan?: boolean;
+
+  @ApiPropertyOptional({ enum: ['budget', 'balanced', 'comfort'], default: 'balanced' })
+  @IsOptional()
+  @IsString()
+  planStrategy?: string;
 }
 
 export class UpdateTripDto {

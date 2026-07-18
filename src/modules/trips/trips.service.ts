@@ -21,6 +21,33 @@ export class TripsService {
       );
     }
 
+    // 清洗会议：过滤不完整条目，避免校验/写入失败
+    const meetings = (dto.meetings || [])
+      .filter(
+        (m): m is Required<
+          Pick<
+            NonNullable<(typeof dto.meetings)>[number],
+            'meetingDate' | 'startTime' | 'endTime' | 'location'
+          >
+        > &
+          NonNullable<(typeof dto.meetings)>[number] =>
+          !!m &&
+          !!m.meetingDate &&
+          !!String(m.startTime || '').trim() &&
+          !!String(m.endTime || '').trim() &&
+          !!String(m.location || '').trim(),
+      )
+      .map((m) => ({
+        title: (m.title && String(m.title).trim()) || '会议',
+        meetingDate: new Date(m.meetingDate as string),
+        startTime: String(m.startTime).trim().slice(0, 5),
+        endTime: String(m.endTime).trim().slice(0, 5),
+        location: String(m.location).trim(),
+        address: m.address,
+        lat: m.lat,
+        lng: m.lng,
+      }));
+
     const trip = await this.prisma.trip.create({
       data: {
         ownerId: userId,
@@ -38,19 +65,9 @@ export class TripsService {
         attractionPreference: dto.attractionPreference || 'any',
         pace: dto.pace || 'balanced',
         status: 'draft',
-        // 创建会议
-        meetings: dto.meetings?.length
+        meetings: meetings.length
           ? {
-              create: dto.meetings.map((m) => ({
-                title: m.title,
-                meetingDate: new Date(m.meetingDate),
-                startTime: m.startTime,
-                endTime: m.endTime,
-                location: m.location,
-                address: m.address,
-                lat: m.lat,
-                lng: m.lng,
-              })),
+              create: meetings,
             }
           : undefined,
       },

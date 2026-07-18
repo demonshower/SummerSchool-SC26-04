@@ -33,11 +33,12 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
+    env_file:
+      - .env
     environment:
+      # Override host for in-network DB
       DATABASE_URL: "postgresql://tripplanner:tripplanner_dev@postgres:5432/trip_planner?schema=public"
       REDIS_URL: "redis://redis:6379"
-      JWT_SECRET: "dev-jwt-secret-change-in-production"
-      JWT_EXPIRES_IN: "7d"
       NODE_ENV: "production"
       PORT: "8080"
       CORS_ORIGIN: "http://localhost:3000"

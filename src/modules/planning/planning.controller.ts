@@ -4,6 +4,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PlanningService } from './planning.service';
+import { AsyncPlanEngine } from './async-plan.engine';
 import { CreatePlanDto } from './dto/planning.dto';
 import { CurrentUser } from '../../common';
 
@@ -12,10 +13,13 @@ import { CurrentUser } from '../../common';
 @UseGuards(AuthGuard('jwt'))
 @Controller('trips/:tripId/planning')
 export class PlanningController {
-  constructor(private readonly planningService: PlanningService) {}
+  constructor(
+    private readonly planningService: PlanningService,
+    private readonly engine: AsyncPlanEngine,
+  ) {}
 
   @Post('plan')
-  @ApiOperation({ summary: '触发自动规划' })
+  @ApiOperation({ summary: '触发分段并行规划（多 LLM 调用 + 高德候选）' })
   async createPlan(
     @CurrentUser('id') userId: string,
     @Param('tripId') tripId: string,
@@ -25,12 +29,22 @@ export class PlanningController {
   }
 
   @Get('status')
-  @ApiOperation({ summary: '查询规划状态' })
+  @ApiOperation({ summary: '查询规划状态与阶段进度' })
   async getStatus(
     @CurrentUser('id') userId: string,
     @Param('tripId') tripId: string,
   ) {
     return this.planningService.getPlanStatus(userId, tripId);
+  }
+
+  @Get('jobs/:jobId')
+  @ApiOperation({ summary: '按 jobId 查询进度' })
+  async getJob(
+    @CurrentUser('id') _userId: string,
+    @Param('tripId') _tripId: string,
+    @Param('jobId') jobId: string,
+  ) {
+    return this.engine.getJob(jobId) || { error: 'job not found' };
   }
 
   @Get('result')

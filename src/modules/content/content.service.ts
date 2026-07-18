@@ -2,19 +2,52 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BusinessException } from '../../common';
 import { ImportTextDto, ImportLinkDto } from './dto/content.dto';
+import { LlmProvider } from '../providers/llm/llm.provider';
+import { AmapProvider } from '../providers/amap/amap.provider';
 
 @Injectable()
 export class ContentService {
   private readonly logger = new Logger(ContentService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly llm: LlmProvider,
+    private readonly amap: AmapProvider,
+  ) {}
 
   /**
-   * 导入文本攻略
+   * 导入文本攻略 — 优先 LLM 抽取，失败回退关键词
    */
   async importText(userId: string, dto: ImportTextDto) {
-    // 简单的关键词抽取（V1 规则版，V2 接入 LLM）
-    const extractedPlaces = this.extractPlacesFromText(dto.rawText);
+    let extractedPlaces: any[] = [];
+    let extractMethod = 'keyword';
+
+    // 尝试从 trip 取目的地作为 city hint
+    let cityHint: string | undefined;
+    if (dto.tripId) {
+      const trip = await this.prisma.trip.findFirst({ where: { id: dto.tripId } });
+      cityHint = trip?.destinationCity;
+    }
+
+    if (this.llm.isEnabled()) {
+      try {
+        extractedPlaces = await this.llm.extractPlacesFromGuide(dto.rawText, cityHint);
+        extractMethod = 'llm';
+        this.logger.log(`LLM extracted ${extractedPlaces.length} places`);
+      } catch (e: any) {
+        this.logger.warn(`LLM extract failed, fallback keywords: ${e.message}`);
+        extractedPlaces = this.extractPlacesFromText(dto.rawText);
+      }
+    } else {
+      extractedPlaces = this.extractPlacesFromText(dto.rawText);
+    }
+
+    // 用高德辅助消歧（可选）
+    if (this.amap.isEnabled() && cityHint) {
+      for (const p of extractedPlaces) {
+        if (!p.city) p.city = cityHint;
+      }
+    }
 
     const source = await this.prisma.contentSource.create({
       data: {
@@ -29,14 +62,44 @@ export class ContentService {
       },
     });
 
-    // 创建地点提及
     for (const place of extractedPlaces) {
-      // 尝试匹配已有 POI
-      const matchedPoi = await this.prisma.place.findFirst({
+      let matchedPoi = await this.prisma.place.findFirst({
         where: {
-          canonicalName: { contains: place.mention },
+          OR: [
+            { canonicalName: { contains: place.mention } },
+            { canonicalName: place.mention },
+          ],
         },
       });
+
+      // 本地库未命中时，尝试高德搜索并缓存到 places
+      if (!matchedPoi && this.amap.isEnabled()) {
+        try {
+          const pois = await this.amap.searchPoi(place.mention, place.city || cityHint, undefined, 3);
+          const top = pois[0];
+          if (top) {
+            const loc = this.amap.parseLocation(top.location);
+            matchedPoi = await this.prisma.place.create({
+              data: {
+                canonicalName: top.name,
+                category: this.mapAmapTypeToCategory(top.type),
+                cityCode: (place.city || cityHint || 'unknown').toLowerCase(),
+                cityName: top.cityname || place.city || cityHint || '',
+                address: top.address || top.adname || '',
+                lat: loc?.lat,
+                lng: loc?.lng,
+                attributes: {
+                  amapId: top.id,
+                  type: top.type,
+                  source: 'amap',
+                },
+              },
+            });
+          }
+        } catch (e: any) {
+          this.logger.warn(`Amap resolve for ${place.mention} failed: ${e.message}`);
+        }
+      }
 
       await this.prisma.placeMention.create({
         data: {
@@ -49,6 +112,7 @@ export class ContentService {
           confidence: place.confidence,
           resolutionStatus: matchedPoi ? 'confirmed' : 'pending',
           tips: place.tips as any,
+          evidenceSpan: place.evidence,
         },
       });
     }
@@ -56,16 +120,13 @@ export class ContentService {
     return {
       id: source.id,
       status: 'completed',
+      extractMethod,
       extractedCount: extractedPlaces.length,
       places: extractedPlaces,
     };
   }
 
-  /**
-   * 导入链接
-   */
   async importLink(userId: string, dto: ImportLinkDto) {
-    // V1: 只保存链接元数据，不抓取正文
     const source = await this.prisma.contentSource.create({
       data: {
         userId,
@@ -85,9 +146,6 @@ export class ContentService {
     };
   }
 
-  /**
-   * 获取攻略抽取结果
-   */
   async getExtract(userId: string, sourceId: string) {
     const source = await this.prisma.contentSource.findFirst({
       where: { id: sourceId, userId },
@@ -99,13 +157,9 @@ export class ContentService {
       },
     });
     if (!source) throw BusinessException.notFound('Content', sourceId);
-
     return source;
   }
 
-  /**
-   * 获取行程关联攻略
-   */
   async getTripContentSources(userId: string, tripId: string) {
     const trip = await this.prisma.trip.findFirst({
       where: { id: tripId, ownerId: userId },
@@ -121,22 +175,15 @@ export class ContentService {
     });
   }
 
-  /**
-   * 删除攻略
-   */
   async deleteSource(userId: string, sourceId: string) {
     const source = await this.prisma.contentSource.findFirst({
       where: { id: sourceId, userId },
     });
     if (!source) throw BusinessException.notFound('Content', sourceId);
-
     await this.prisma.contentSource.delete({ where: { id: sourceId } });
     return { success: true };
   }
 
-  /**
-   * 确认地点映射
-   */
   async resolveMention(userId: string, mentionId: string, placeId: string) {
     const mention = await this.prisma.placeMention.findUnique({
       where: { id: mentionId },
@@ -158,10 +205,16 @@ export class ContentService {
     return { success: true };
   }
 
-  // ===== 简单关键词抽取 (V1 规则版) =====
+  private mapAmapTypeToCategory(type: string): string {
+    if (!type) return 'attraction';
+    if (type.includes('餐') || type.includes('美食')) return 'restaurant';
+    if (type.includes('酒店') || type.includes('宾馆') || type.includes('住宿')) return 'hotel';
+    if (type.includes('车站') || type.includes('机场') || type.includes('地铁')) return 'station';
+    if (type.includes('购物') || type.includes('商场')) return 'shopping';
+    return 'attraction';
+  }
 
   private extractPlacesFromText(text: string) {
-    // 已知地点关键词库
     const knownPlaces = [
       { name: '西湖', duration: 180, period: 'afternoon' },
       { name: '灵隐寺', duration: 120, period: 'morning' },
@@ -184,20 +237,16 @@ export class ContentService {
     const results: any[] = [];
     for (const p of knownPlaces) {
       if (text.includes(p.name)) {
-        // 查找上下文
         const idx = text.indexOf(p.name);
         const context = text.substring(Math.max(0, idx - 30), Math.min(text.length, idx + 50));
-
         let sentiment = 'positive';
         if (context.includes('不推荐') || context.includes('避坑') || context.includes('不好')) {
           sentiment = 'negative';
         }
-
         const tips: string[] = [];
         if (context.includes('早上') || context.includes('上午')) tips.push('建议上午前往');
         if (context.includes('排队')) tips.push('可能需要排队');
         if (context.includes('免费')) tips.push('免费景点');
-
         results.push({
           mention: p.name,
           suggestedDurationMinutes: p.duration,
@@ -209,12 +258,10 @@ export class ContentService {
         });
       }
     }
-
     return results;
   }
 
   private generateSummary(text: string): string {
-    // 简单截取前100字作为摘要
     const clean = text.replace(/\s+/g, ' ').trim();
     if (clean.length <= 100) return clean;
     return clean.substring(0, 100) + '...';

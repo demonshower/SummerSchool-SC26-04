@@ -1,10 +1,11 @@
 import {
   Controller, Get, Post, Patch, Delete,
-  Body, Param, Query, UseGuards, HttpCode, HttpStatus,
+  Body, Param, Query, UseGuards, HttpCode, HttpStatus, Inject, forwardRef, Logger,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { TripsService } from './trips.service';
+import { PlanningService } from '../planning/planning.service';
 import { CreateTripDto, UpdateTripDto, TripQueryDto } from './dto/trip.dto';
 import { CurrentUser } from '../../common';
 
@@ -13,12 +14,50 @@ import { CurrentUser } from '../../common';
 @UseGuards(AuthGuard('jwt'))
 @Controller('trips')
 export class TripsController {
-  constructor(private readonly tripsService: TripsService) {}
+  private readonly logger = new Logger(TripsController.name);
+
+  constructor(
+    private readonly tripsService: TripsService,
+    @Inject(forwardRef(() => PlanningService))
+    private readonly planningService: PlanningService,
+  ) {}
 
   @Post()
-  @ApiOperation({ summary: '创建旅行' })
+  @ApiOperation({ summary: '创建旅行（可选 autoPlan=true 立即生成日程）' })
   async create(@CurrentUser('id') userId: string, @Body() dto: CreateTripDto) {
-    return this.tripsService.create(userId, dto);
+    const trip = await this.tripsService.create(userId, dto);
+
+    if (dto.autoPlan) {
+      try {
+        const accepted = await this.planningService.createPlan(userId, trip.id, {
+          strategy: dto.planStrategy || 'balanced',
+        });
+        const plan = await this.planningService.waitForJob(accepted.jobId);
+        const detail = await this.tripsService.findOne(userId, trip.id);
+        return {
+          ...detail,
+          autoPlan: {
+            status: plan?.status || 'completed',
+            jobId: accepted.jobId,
+            stats: plan?.stats,
+            explanation: plan?.explanation,
+            stages: plan?.stages,
+          },
+        };
+      } catch (e: any) {
+        this.logger.warn(`autoPlan failed for trip ${trip.id}: ${e.message}`);
+        const detail = await this.tripsService.findOne(userId, trip.id);
+        return {
+          ...detail,
+          autoPlan: {
+            status: 'failed',
+            error: e.message || '自动规划失败，请在详情页点击重新规划',
+          },
+        };
+      }
+    }
+
+    return trip;
   }
 
   @Get()

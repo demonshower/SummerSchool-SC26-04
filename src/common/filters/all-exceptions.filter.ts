@@ -19,7 +19,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let code = ErrorCode.INVALID_INPUT;
+    let code: string = ErrorCode.INVALID_INPUT;
     let message = 'Internal server error';
     let details: any = undefined;
 
@@ -29,12 +29,19 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
         const resp = exceptionResponse as any;
-        if (resp.error) {
+        if (resp.error && typeof resp.error === 'object') {
           code = resp.error.code || code;
-          message = resp.error.message || message;
+          message = this.normalizeMessage(resp.error.message) || message;
           details = resp.error.details;
         } else {
-          message = resp.message || message;
+          // class-validator / Nest ValidationPipe: { message: string[] | string, error: 'Bad Request' }
+          message = this.normalizeMessage(resp.message) || message;
+          if (Array.isArray(resp.message)) {
+            details = { validation: resp.message };
+          }
+          if (status === HttpStatus.BAD_REQUEST) {
+            code = ErrorCode.INVALID_INPUT;
+          }
         }
       } else if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
@@ -54,5 +61,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
         timestamp: new Date().toISOString(),
       },
     });
+  }
+
+  private normalizeMessage(msg: unknown): string {
+    if (Array.isArray(msg)) return msg.join('；');
+    if (typeof msg === 'string') return msg;
+    if (msg == null) return '';
+    return String(msg);
   }
 }
