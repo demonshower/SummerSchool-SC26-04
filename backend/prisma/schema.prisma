@@ -1,0 +1,401 @@
+// ============================================================================
+// Trip Planner V1 - Prisma Schema
+// ============================================================================
+// 设计原则:
+//   1. 内部实体与供应商实体分离，供应商 ID 不做主键
+//   2. 事实、推断、生成文本分开存
+//   3. 金额存最小货币单位整数(分)，禁止浮点
+//   4. 日期时间存 UTC，附带 IANA 时区
+//   5. 行程版本化，支持审计与撤销
+//   6. 报价是快照，追加不覆盖
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+//  1. 用户与认证
+// ============================================================================
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique @db.VarChar(80)
+  email        String?  @unique @db.VarChar(120)
+  passwordHash String   @map("password_hash") @db.VarChar(256)
+  isGuest      Boolean  @default(false) @map("is_guest")
+  locale       String   @default("zh-CN") @db.VarChar(10)
+  status       String   @default("active") @db.VarChar(20) // active / suspended / deleted
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  // Relations
+  trips          Trip[]
+  contentSources ContentSource[]
+  userEvents     UserEvent[]
+
+  @@map("users")
+}
+
+// ============================================================================
+//  2. 旅行 (Trip) — 聚合根
+// ============================================================================
+
+model Trip {
+  id                   String   @id @default(cuid())
+  ownerId              String   @map("owner_id")
+  title                String   @db.VarChar(200)
+  originCity           String   @map("origin_city") @db.VarChar(50)
+  destinationCity      String   @map("destination_city") @db.VarChar(50)
+  startDate            DateTime @db.Date @map("start_date")
+  endDate              DateTime @db.Date @map("end_date")
+  earliestDeparture    DateTime @map("earliest_departure")
+  latestReturn         DateTime @map("latest_return")
+  budgetMinor          Int      @map("budget_minor")
+  transportPreference  String   @default("any") @map("transport_preference") @db.VarChar(20) // any / flight / train
+  hotelMaxPriceMinor   Int      @map("hotel_max_price_minor")
+  wantsSightseeing     Boolean  @default(true) @map("wants_sightseeing")
+  attractionPreference String   @default("any") @map("attraction_preference") @db.VarChar(20) // any / 自然 / 人文 / 商业 / 美食
+  pace                 String   @default("balanced") @db.VarChar(20) // relaxed / balanced / intense
+  status               String   @default("draft") @db.VarChar(20) // draft / planning / ready / confirmed / archived
+  version              Int      @default(1)
+  timezone             String   @default("Asia/Shanghai") @db.VarChar(50)
+  currency             String   @default("CNY") @db.VarChar(3)
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  owner         User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  meetings      TripMeeting[]
+  days          TripDay[]
+  quoteSearches QuoteSearch[]
+  planVersions  PlanVersion[]
+
+  // Index
+  @@index([ownerId, status])
+  @@index([ownerId, createdAt(sort: Desc)])
+  @@map("trips")
+}
+
+// ============================================================================
+//  2.1 会议/固定事项
+// ============================================================================
+
+model TripMeeting {
+  id          String   @id @default(cuid())
+  tripId      String   @map("trip_id")
+  title       String   @db.VarChar(200)
+  meetingDate DateTime @db.Date @map("meeting_date")
+  startTime   String   @db.VarChar(5) // "09:00"
+  endTime     String   @db.VarChar(5) // "12:00"
+  location    String   @db.VarChar(200)
+  address     String?  @db.VarChar(300)
+  lat         Float?
+  lng         Float?
+  note        String?  @db.VarChar(500)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@map("trip_meetings")
+}
+
+// ============================================================================
+//  3. 日程天 (TripDay)
+// ============================================================================
+
+model TripDay {
+  id             String   @id @default(cuid())
+  tripId         String   @map("trip_id")
+  localDate      DateTime @db.Date @map("local_date")
+  dayType        String   @map("day_type") @db.VarChar(20) // departure / meeting_day / return / free
+  budgetMinor    Int      @default(0) @map("budget_minor")
+  totalCostMinor Int      @default(0) @map("total_cost_minor")
+  startPlaceId   String?  @map("start_place_id")
+  endPlaceId     String?  @map("end_place_id")
+  weatherSummary String?  @map("weather_summary") @db.VarChar(200)
+
+  // Relations
+  trip  Trip            @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  items ItineraryItem[]
+
+  @@unique([tripId, localDate])
+  @@index([tripId])
+  @@map("trip_days")
+}
+
+// ============================================================================
+//  4. 行程活动项 (ItineraryItem)
+// ============================================================================
+
+model ItineraryItem {
+  id           String    @id @default(cuid())
+  tripDayId    String    @map("trip_day_id")
+  kind         String    @db.VarChar(20) // transport / commute / hotel / meal / attraction / meeting / fixed / free_time
+  title        String    @db.VarChar(200)
+  subtitle     String?   @db.VarChar(100)
+  position     Int       @default(0)
+  startAt      DateTime? @map("start_at")
+  endAt        DateTime? @map("end_at")
+  placeId      String?   @map("place_id")
+  locationText String?   @map("location_text") @db.VarChar(200)
+  costMinor    Int       @default(0) @map("cost_minor")
+  locked       Boolean   @default(false)
+  isFixed      Boolean   @default(false) @map("is_fixed")
+  note         String?   @db.VarChar(500)
+  icon         String?   @db.VarChar(50)
+  status       String    @default("estimated") @db.VarChar(20) // estimated / quoted / confirmed
+  sourceType   String?   @map("source_type") @db.VarChar(20) // system / guide / user
+  version      Int       @default(1)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  tripDay          TripDay             @relation(fields: [tripDayId], references: [id], onDelete: Cascade)
+  place            Place?              @relation(fields: [placeId], references: [id])
+  transportSegment TransportSegment?
+
+  @@index([tripDayId, position])
+  @@map("itinerary_items")
+}
+
+// ============================================================================
+//  4.1 交通段 (TransportSegment) — 活动项的交通详情
+// ============================================================================
+
+model TransportSegment {
+  itemId          String  @id @map("item_id")
+  mode            String  @db.VarChar(20) // train / flight / bus / walk / taxi / subway / car
+  fromPlaceId     String? @map("from_place_id")
+  toPlaceId       String? @map("to_place_id")
+  fromStation     String? @map("from_station") @db.VarChar(100)
+  toStation       String? @map("to_station") @db.VarChar(100)
+  departureTime   DateTime? @map("departure_time")
+  arrivalTime     DateTime? @map("arrival_time")
+  durationSeconds Int?    @map("duration_seconds")
+  distanceMeters  Int?    @map("distance_meters")
+  costMinor       Int     @default(0) @map("cost_minor")
+  carrierName     String? @map("carrier_name") @db.VarChar(100) // 如 "G7311"
+  carrierCode     String? @map("carrier_code") @db.VarChar(50)
+  providerCode    String? @map("provider_code") @db.VarChar(50)
+  routeObservedAt DateTime? @map("route_observed_at")
+
+  // Relations
+  item ItineraryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("transport_segments")
+}
+
+// ============================================================================
+//  5. 地点 (Place) — POI
+// ============================================================================
+
+model Place {
+  id            String   @id @default(cuid())
+  canonicalName String   @map("canonical_name") @db.VarChar(200)
+  category      String   @db.VarChar(50) // attraction / restaurant / hotel / station / shopping / meeting_point
+  cityCode      String   @map("city_code") @db.VarChar(50)
+  cityName      String   @map("city_name") @db.VarChar(50)
+  address       String?  @db.VarChar(300)
+  lat           Float?
+  lng           Float?
+  timezone      String?  @default("Asia/Shanghai") @db.VarChar(50)
+  // attributes 存 JSON: 评分、描述、营业时间、电话、门票价格等
+  // 示例: {"rating": 4.5, "description": "...", "openHours": "08:00-18:00", "phone": "...", "ticketPrice": 0}
+  attributes    Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  itineraryItems ItineraryItem[]
+  mentions       PlaceMention[]
+
+  // Index
+  @@index([cityCode, category])
+  @@index([canonicalName])
+  @@map("places")
+}
+
+// ============================================================================
+//  6. 报价搜索 (QuoteSearch) + 报价快照 (Quote)
+// ============================================================================
+
+model QuoteSearch {
+  id          String   @id @default(cuid())
+  tripId      String   @map("trip_id")
+  productType String   @map("product_type") @db.VarChar(20) // flight / train / hotel / ticket
+  requestHash String   @map("request_hash") @db.VarChar(64) // 请求参数 SHA256 哈希，用于去重
+  criteria    Json     // 搜索条件
+  status      String   @default("pending") @db.VarChar(20) // pending / completed / partial / failed
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  trip   Trip    @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  quotes Quote[]
+
+  @@index([tripId, productType])
+  @@index([requestHash])
+  @@map("quote_searches")
+}
+
+model Quote {
+  id              String   @id @default(cuid())
+  quoteSearchId   String   @map("quote_search_id")
+  providerCode    String   @map("provider_code") @db.VarChar(50)
+  productType     String   @map("product_type") @db.VarChar(20) // flight / train / hotel / ticket
+  productName     String   @map("product_name") @db.VarChar(200)
+  comparableKey   String   @map("comparable_key") @db.VarChar(200) // 可比商品标识
+  basePriceMinor  Int      @map("base_price_minor") // 基础价(分)
+  taxesFeesMinor  Int      @default(0) @map("taxes_fees_minor") // 税费(分)
+  totalPriceMinor Int      @map("total_price_minor") // 总价(分)
+  currency        String   @default("CNY") @db.VarChar(3)
+  priceUnit       String   @default("total") @map("price_unit") @db.VarChar(20) // total / person / room-night
+  // conditions 存 JSON: 退改政策、包含项
+  // 示例: {"cancellation": "free", "deadline": "2026-08-05T18:00:00+08:00", "breakfast": true, "baggage": "20kg"}
+  conditions      Json?
+  inventoryStatus String  @default("unknown") @map("inventory_status") @db.VarChar(20) // available / limited / sold_out / unknown
+  deepLink        String? @map("deep_link") @db.VarChar(500)
+  observedAt      DateTime @map("observed_at") // 报价抓取时间
+  expiresAt       DateTime @map("expires_at") // 报价过期时间
+
+  // Relations
+  quoteSearch QuoteSearch @relation(fields: [quoteSearchId], references: [id], onDelete: Cascade)
+
+  @@index([quoteSearchId])
+  @@index([comparableKey])
+  @@index([expiresAt])
+  @@map("quotes")
+}
+
+// ============================================================================
+//  7. 攻略内容 (ContentSource) + 地点提及 (PlaceMention)
+// ============================================================================
+
+model ContentSource {
+  id              String   @id @default(cuid())
+  tripId          String?  @map("trip_id")
+  userId          String   @map("user_id")
+  sourceType      String   @map("source_type") @db.VarChar(20) // text / link / upload
+  sourceUrl       String?  @map("source_url") @db.VarChar(500)
+  title           String?  @db.VarChar(200)
+  authorDisplay   String?  @map("author_display") @db.VarChar(100)
+  rawText         String?  @map("raw_text") // 原始文本(用户粘贴)
+  summary         String?  // AI 生成的摘要
+  extractedPlaces Json?    @map("extracted_places") // 抽取的地点列表(JSON)
+  status          String   @default("pending") @db.VarChar(20) // pending / processing / completed / failed
+  errorMessage    String?  @map("error_message") @db.VarChar(500)
+  importedAt      DateTime @default(now()) @map("imported_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mentions PlaceMention[]
+
+  @@index([tripId])
+  @@index([userId])
+  @@map("content_sources")
+}
+
+model PlaceMention {
+  id                   String   @id @default(cuid())
+  contentSourceId      String   @map("content_source_id")
+  placeId              String?  @map("place_id")
+  mentionText          String   @map("mention_text") @db.VarChar(200) // 原文中的称呼
+  evidenceSpan         String?  @map("evidence_span") // 原文证据位置
+  suggestedDurationMin Int?     @map("suggested_duration_minutes")
+  suggestedPeriod      String?  @map("suggested_period") @db.VarChar(20) // morning / afternoon / evening / anytime
+  tips                 Json?    // 攻略提示，如 ["早餐时段选择更多"]
+  sentiment            String?  @db.VarChar(20) // positive / neutral / negative
+  confidence           Float?   @default(0) // 抽取置信度 0-1
+  resolutionStatus     String   @default("pending") @map("resolution_status") @db.VarChar(20) // pending / confirmed / rejected / ambiguous
+  resolvedAt           DateTime? @map("resolved_at")
+
+  // Relations
+  contentSource ContentSource @relation(fields: [contentSourceId], references: [id], onDelete: Cascade)
+  place         Place?        @relation(fields: [placeId], references: [id])
+
+  @@index([contentSourceId])
+  @@index([placeId])
+  @@index([resolutionStatus])
+  @@map("place_mentions")
+}
+
+// ============================================================================
+//  8. 规划版本 (PlanVersion)
+// ============================================================================
+
+model PlanVersion {
+  id        String   @id @default(cuid())
+  tripId    String   @map("trip_id")
+  version   Int
+  strategy  String   @db.VarChar(20) // budget / balanced / comfort
+  status    String   @default("draft") @db.VarChar(20) // draft / applied / superseded
+  summary   String?
+  // evidence 存 JSON: 规划依据
+  // 示例: {"transportSelected": "高铁G7311", "hotelSelected": "西湖美居酒店", "totalCostMinor": 128000}
+  evidence  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, version])
+  @@index([tripId, status])
+  @@map("plan_versions")
+}
+
+// ============================================================================
+//  9. 用户事件 (UserEvent) — 画像/推荐基础
+// ============================================================================
+
+model UserEvent {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  tripId     String?  @map("trip_id")
+  eventType  String   @map("event_type") @db.VarChar(50)
+  // 事件类型:
+  //   trip_created / trip_confirmed / trip_completed
+  //   item_added / item_removed / item_locked / item_moved
+  //   quote_viewed / quote_clicked / quote_booked
+  //   guide_imported / guide_place_confirmed
+  //   recommendation_clicked / recommendation_dismissed
+  //   delete_reason (不感兴趣/太贵/太远/去过)
+  entityType String   @map("entity_type") @db.VarChar(50) // trip / item / quote / place / guide / recommendation
+  entityId   String   @map("entity_id")
+  context    Json?    // 事件上下文
+  occurredAt DateTime @default(now()) @map("occurred_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, eventType])
+  @@index([userId, occurredAt(sort: Desc)])
+  @@index([tripId])
+  @@map("user_events")
+}
+
+// ============================================================================
+//  10. 城市字典 (City) — 基础数据
+// ============================================================================
+
+model City {
+  id        String  @id @default(cuid())
+  code      String  @unique @db.VarChar(50) // 城市代码，如 "hangzhou"
+  name      String  @db.VarChar(50) // 中文名，如 "杭州"
+  province  String? @db.VarChar(50) // 省份
+  lat       Float?
+  lng       Float?
+  timezone  String  @default("Asia/Shanghai") @db.VarChar(50)
+  isActive  Boolean @default(true) @map("is_active")
+
+  @@map("cities")
+}
